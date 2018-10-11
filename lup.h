@@ -3,10 +3,10 @@
 
 #include "matrix.h"
 
-#define MAX_N_ELEMENTS 1024 * 1024 * 128 // One GB worth of doubles //131072
-#define MAX_N_ROWS 16384
+#define MAX_N_ELEMENTS 1024 * 1024 * 15 // 120 MiB worth of doubles //131072
+#define MAX_N_ROWS (1<<14)
 #define N_REF_VECTORS 5
-#define HEAP_SIZE 2*16384
+#define HEAP_SIZE (1<<15)
 
 typedef struct {
 
@@ -16,7 +16,6 @@ typedef struct {
     indx_t row_ptr_begin[MAX_N_ROWS];
     indx_t row_ptr_end[MAX_N_ROWS];
     indx_t row_order[MAX_N_ROWS];
-    //indx_t U_START[MAX_N_ROWS];
     size_t m, n;
     size_t count;
 

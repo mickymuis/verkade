@@ -16,7 +16,7 @@ heap_clear( heap_t* h, size_t totalsize ) {
     h->count =1;
     h->regions[0].start    =0;
     h->regions[0].size     =totalsize;
-//    h->regions[0].userdata =0;
+    h->regions[0].userdata =0;
 //    h->regions[0].free     =true;
     set_free( h->regions[0] );
     assert( is_free( h->regions[0] ) );
@@ -36,7 +36,7 @@ heap_alloc( heap_t* h, size_t size, int userdata ) {
         }
     }
     if( best == -1 ) {
-        fprintf( stderr, "(e) heap_alloc(): insufficient free space to allocate %ld elements.\n", size );
+        // Insufficient space
         return -1;
     }
     if( loss != 0 && h->count == h->capacity ) {
@@ -54,13 +54,13 @@ heap_alloc( heap_t* h, size_t size, int userdata ) {
         h->regions[best+1].size     =size( h->regions[best] ) - size;
 //        h->regions[best+1].free     =true;
         set_free( h->regions[best+1] );
-  //      h->regions[best+1].userdata =0;
+        h->regions[best+1].userdata =0;
     }
 
     h->regions[best].size     =size;
     //h->regions[best].free     =false;
     set_nonfree( h->regions[best] );
-//    h->regions[best].userdata =userdata;
+    h->regions[best].userdata =userdata;
 
     return ptr;
 }
@@ -113,7 +113,7 @@ heap_free( heap_t* h, heapptr_t ptr ) {
     // Set the region to free
 //    h->regions[i].free  =true;
     set_free( h->regions[i] );
-//    h->regions[i].userdata =0;
+    h->regions[i].userdata =0;
 
     return 0;
 }
@@ -125,7 +125,7 @@ heap_defrag( heap_t* h, heap_movefunc_t func, void* user ) {
     size_t first_empty =0; // Offset of the first empty element
     size_t first_empty_desc =0;
 
-    for( size_t i =0; i < h->count-1; i++ ) {
+    for( size_t i =0; i < h->count; i++ ) {
         region_desc_t *desc = &h->regions[i];
         if( is_nonfree( *desc ) ){
             if( desc->start != first_empty ) {
@@ -133,9 +133,13 @@ heap_defrag( heap_t* h, heap_movefunc_t func, void* user ) {
                     fprintf( stderr, "(e) heap_defrag(): user memmove function returned non-zero.\n" );
                     return;
                 }
-                first_empty +=size( *desc );
             }
-            h->regions[first_empty_desc++] = *desc;
+            h->regions[first_empty_desc].size = desc->size;
+            h->regions[first_empty_desc].start = first_empty;
+            h->regions[first_empty_desc].userdata = desc->userdata;
+            first_empty_desc++;
+
+            first_empty +=size( *desc );
         }
     }
 
@@ -147,6 +151,11 @@ heap_defrag( heap_t* h, heap_movefunc_t func, void* user ) {
     h->regions[first_empty_desc].start =first_empty;
     h->regions[first_empty_desc].size  =empty_size;
     set_free( h->regions[first_empty_desc] );
+}
+
+size_t 
+heap_regionSize( region_desc_t* r ) {
+    return size( *r );
 }
 
 void 

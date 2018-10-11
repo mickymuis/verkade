@@ -39,6 +39,25 @@ print_vec( double values[], size_t m, size_t* order ) {
     printf( ")\n" );
 }
 
+/** This function is called by the heap_defrag() function (garbage collection)
+ */
+static int 
+crs_memmove( matrix_t* m, region_desc_t region, heapptr_t dest ) {
+
+    size_t size =heap_regionSize( &region );
+
+    // Move the actual elements first
+    memmove( &m->values[dest], &m->values[region.start], size * sizeof(double) );
+    memmove( &m->col_ind[dest], &m->col_ind[region.start], size * sizeof(indx_t) );
+
+    size_t row =region.userdata;
+
+    m->row_ptr_begin[row] = dest;
+    m->row_ptr_end[row]   = dest + size -1;
+
+    return 0;
+}
+
 static inline ssize_t
 replace_row( matrix_t* m, 
             double new_values[],
@@ -49,14 +68,18 @@ replace_row( matrix_t* m,
     size_t old_length = 1 + m->row_ptr_end[row] - m->row_ptr_begin[row];
     ssize_t delta = new_length - old_length;
 
-   // printf( "(i) freeing %ld bytes at %ld.\n", old_length, m->row_ptr_begin[row] );
     if( heap_free( heap, m->row_ptr_begin[row] ) != 0 ) abort();
-    //heap_debugPrint( heap );
     heapsptr_t start = heap_alloc( heap, new_length, row );
-    if( start == -1 ) abort();
-
-   // printf( "(i) allocing %ld bytes at %ld.\n", new_length, start );
-    //heap_debugPrint( heap );
+    if( start == -1 ) { 
+        // Run garbage collection and try again
+        printf( "(i) Out of memory, running heap_defrag()\n" );
+        heap_defrag( heap, (heap_movefunc_t)crs_memmove, (void*)m );
+        start = heap_alloc( heap, new_length, row );
+        if( start == -1 ) {
+            fprintf( stderr, "(e) replace_row(): insufficient free space to allocate %ld elements.\n", new_length );
+            abort();
+        }
+    }
 
     m->row_ptr_begin[row] = start;
     m->row_ptr_end[row]   = start + (new_length - 1);
@@ -88,50 +111,6 @@ swap_rows( indx_t row_order[], size_t i, size_t k ) {
 }
 
 
-/** This function is called by the heap_defrag() function (garbage collection)
- */
-/*static int 
-crs_memmove( matrix_t* m, heapptr_t dest, heapptr_t src, size_t count ) {
-
-    // Move the actual elements first
-    memmove( &m->values[dest], &m->values[src], count * sizeof(double) );
-    memmove( &m->col_ind[dest], &m->col_ind[src], count * sizeof(indx_t) );
-
-    // Unfortunately, we have to do a linear search
-    // in order to know to which row this pointer belongs to
-
-    for( size_t i =0; i < m->m; i++ ) {
-        if( m->row_ptr_begin[i] == src ) {
-            indx_t delta = m->row_ptr_end[i] - m->row_ptr_begin[i];
-            m->row_ptr_begin[i] = dest;
-            m->row_ptr_end[i] = dest + delta;
-            return 0;
-        }
-    }
-
-    return -1;
-}
-
-static size_t
-crs_defrag( matrix_t* m ) {
-
-    size_t next_empty =0;
-    for( size_t i =0; i < m->m; i++ ) {
-        size_t src =m->row_ptr_begin[i];
-        size_t count = 1 + m->row_ptr_end[i] - src;
-
-        if( src != next_empty ) {
-            memmove( &m->values[next_empty], &m->values[src], count * sizeof(double) );
-            memmove( &m->col_ind[next_empty], &m->col_ind[src], count * sizeof(indx_t) );
-
-            m->row_ptr_begin[i] = next_empty;
-            m->row_ptr_end[i] = next_empty + count - 1;
-        }
-
-        next_empty += count;
-    }
-    return next_empty;
-}*/
 
 /** Computes the LU-factorisation with partial pivotting.
  *  The input matrix is provided in CRS form in the five arrays,
@@ -199,7 +178,6 @@ lup( matrix_t* m ) {
             const indx_t k =m->row_order[kk];
 
             // Find the pivot column in the dest row
-            //size_t row_length; 
             indx_t i_off = m->row_ptr_begin[i] + pivot_off, k_off = m->row_ptr_begin[k];
             double mult;
             
@@ -216,8 +194,6 @@ lup( matrix_t* m ) {
             mult = m->values[k_off] / m->values[i_off]; // Calculate the multiplication factor
             values_tmp[o] = mult; // Store the multiplier; it is part of the L matrix
             col_ind_tmp[o] = pivot;
-
-            //printf( "Mult: %6.2f / %6.2f = %6.2f\n", m->values[k_off], m->values[i_off], mult );
 
             i_off++; k_off++; o++;// Skip the pivot element
 
@@ -249,14 +225,7 @@ lup( matrix_t* m ) {
                                      &heap );
 
         }
-       // heap_defrag( &heap, (heap_movefunc_t)crs_memmove, (void*)m );
-       // heap_debugPrint( &heap );
-       /* size_t next_empty =crs_defrag( m );
-        heap_clear( &heap );
-        heap_free( &heap, next_empty, MAX_N_ELEMENTS - next_empty ); 
-        heap_debugPrint( &heap );*/
     }
-//    heap_debugPrint( &heap );
     return 0;
 }
 
