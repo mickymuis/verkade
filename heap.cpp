@@ -4,19 +4,25 @@
 #include <stdio.h>
 
 void 
-heap_clear( heap_t* h ) {
+heap_clear( heap_t* h, size_t totalsize ) {
     memset( h->regions, 0, h->capacity * sizeof( region_desc_t ) );
-    h->count =0;
+    h->count =1;
+    h->regions[0].start    =0;
+    h->regions[0].size     =totalsize;
+    h->regions[0].userdata =0;
+    h->regions[0].free     =true;
 }
 
 heapsptr_t 
-heap_alloc( heap_t* h, size_t size ) {
+heap_alloc( heap_t* h, size_t size, int userdata ) {
 
     size_t loss  = INT_MAX, i;
     ssize_t best = -1;
     for( i =0; i < h->count; i++ ) {
-        if( size <= h->regions[i].size && h->regions[i].size - size < loss ) {
-            loss = h->regions[i].size - size;
+        region_desc_t* r =&h->regions[i];
+        if( !r->free ) continue;
+        if( size <= r->size && r->size - size < loss ) {
+            loss = r->size - size;
             best = i;
         }
     }
@@ -24,69 +30,87 @@ heap_alloc( heap_t* h, size_t size ) {
         fprintf( stderr, "(e) heap_alloc(): insufficient free space to allocate %ld elements.\n", size );
         return -1;
     }
+    if( loss != 0 && h->count == h->capacity ) {
+        fprintf( stderr, "(e) heap_alloc(): insufficient free in meta array.\n" );
+        return -1;
+    }
 
     heapptr_t ptr =h->regions[best].start;
-    // Resize the existing region
-    h->regions[best].start +=size;
-    h->regions[best].size  -=size;
-    if( h->regions[best].size == 0 ) {
-        h->count--;
-        if( best != h->count )
-            memmove( &h->regions[best], &h->regions[best+1], (h->count - best) * sizeof(region_desc_t) );
+
+    if( loss != 0 ) {
+        if( best != h->count-1 )
+            memmove( &h->regions[best+2], &h->regions[best+1], (h->count-best-1) * sizeof(region_desc_t) );
+        h->count++;
+        h->regions[best+1].start    =h->regions[best].start + size;
+        h->regions[best+1].size     =h->regions[best].size - size;
+        h->regions[best+1].free     =true;
+        h->regions[best+1].userdata =0;
     }
+
+    h->regions[best].size     =size;
+    h->regions[best].free     =false;
+    h->regions[best].userdata =userdata;
 
     return ptr;
 }
 
 int
-heap_free( heap_t* h, heapptr_t ptr, size_t size ) {
+heap_free( heap_t* h, heapptr_t ptr ) {
 
-    // First, find the first larger pointer in the region array
+    // First, find the the pointer in the region array
+    bool valid =false;
     size_t i =0;
     for( i =0; i < h->count; i++ ) {
-        if( h->regions[i].start >= ptr ) {
-            if( ptr+size > h->regions[i].start ) {
-                fprintf( stderr, "(e) heap_free(): invalid free: region already (partially) freed.\n" );
-                return -1;
+        region_desc_t* r =&h->regions[i];
+        if( r->start == ptr ) {
+            if( !r->free ) {
+                valid =true;
             }
             break;
         }
     }
-
-    int move = (i != h->count) ? 1 : 0;
-    const size_t next =i;
-
-    // Next region is adjacent
-    if( i != h->count && h->regions[i].start == ptr+size ) {
-        move--;
-        size += h->regions[i].size;
-    }
-    // Previous region is adjacent
-    if( i != 0 && h->regions[i-1].start + h->regions[i-1].size == ptr ) {
-        move--;
-        ptr = h->regions[i-1].start;
-        size+=h->regions[i-1].size;
-        i--;
-    }
-    
-    if( h->count+move > h->capacity ) { 
-        fprintf( stderr, "(e) heap_free(): out of space in meta array, cannot free any more regions.\n" );
+    if( !valid ) {
+        fprintf( stderr, "(e) heap_free(): invalid free: region already (partially) freed.\n" );
         return -1;
     }
 
-    if( move != 0 )
-        memmove( &h->regions[next+move], &h->regions[next], (h->count-next) * sizeof(region_desc_t) );
+    // Set the region to free
+    h->regions[i].free     =true;
+    h->regions[i].userdata =0;
 
-    h->regions[i].start =ptr;
-    h->regions[i].size  =size;
-    h->count += (move == 0) ? (int)(i == h->count) : move;
+    // Lastly we check if adjacent regions are also free
+    int move =0;
+    heapptr_t base =h->regions[i].start;
+    heapptr_t size =h->regions[i].size;
+    const size_t next =i+1;
+
+    if( i != h->count && h->regions[i+1].free ) {
+        move++;
+        size += h->regions[i+1].size;
+    }
+
+    if( i != 0 && h->regions[i-1].free ) {
+        move++;
+        i--;
+        size += h->regions[i-1].size;
+        base = h->regions[i-1].start;
+    }
+
+    if( move ) {
+        memmove( &h->regions[next-move], &h->regions[next], (h->count-next) * sizeof(region_desc_t) );
+
+        h->regions[i].start =base;
+        h->regions[i].size  =size;
+        h->count += move;
+
+    }
 
     return 0;
 }
 
 void 
 heap_defrag( heap_t* h, heap_movefunc_t func, void* user ) {
-
+/*
     if( h->count < 2 ) return;
     size_t first_empty =0; // Offset of the first empty element
 
@@ -110,12 +134,21 @@ heap_defrag( heap_t* h, heap_movefunc_t func, void* user ) {
     heap_clear( h );
     h->count =1;
     h->regions[0].start =first_empty;
-    h->regions[0].size  =empty_size;
+    h->regions[0].size  =empty_size;*/
 }
 
 void 
 heap_debugPrint( heap_t* h ) {
-    printf( "(i) Heap. Total regions %ld, capacity %ld.\n", h->count, h->capacity );
-    for( size_t i =0; i < h->count; i++ )
-        printf( "(*) Region %ld, start %ld, size %ld\n", i, h->regions[i].start, h->regions[i].size );
+    printf( "(i) Heap: total regions %ld, capacity %ld.\n", h->count, h->capacity );
+    size_t totalsize =0, fragsize =0;
+    for( size_t i =0; i < h->count; i++ ) {
+        //printf( "(*) Region %ld (%s), start %ld, size %ld\n", 
+        //i, h->regions[i].start, h->regions[i].size, h->regions[i].free ? "free" : "nonfree" );
+        if( h->regions[i].free) {
+            totalsize += h->regions[i].size;
+            if( i != h->count-1 )
+                fragsize += h->regions[i].size;
+        }
+    }
+    printf( "(i) Heap: total size in free regions %ld, of which %ld fragmented.\n", totalsize, fragsize );
 }

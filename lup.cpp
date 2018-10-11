@@ -50,9 +50,9 @@ replace_row( matrix_t* m,
     ssize_t delta = new_length - old_length;
 
    // printf( "(i) freeing %ld bytes at %ld.\n", old_length, m->row_ptr_begin[row] );
-    heap_free( heap, m->row_ptr_begin[row], old_length );
+    heap_free( heap, m->row_ptr_begin[row] );
     //heap_debugPrint( heap );
-    size_t start = heap_alloc( heap, new_length );
+    size_t start = heap_alloc( heap, new_length, row );
    // printf( "(i) allocing %ld bytes at %ld.\n", new_length, start );
     //heap_debugPrint( heap );
 
@@ -146,9 +146,14 @@ lup( matrix_t* m ) {
     heap_t heap;
     heap.regions = HEAP_REGIONS;
     heap.capacity =HEAP_SIZE;
-    heap_clear( &heap );
-    heap_free( &heap, m->count, MAX_N_ELEMENTS - m->count );
-    //heap_debugPrint( &heap );
+    heap_clear( &heap, MAX_N_ELEMENTS );
+    // Add the row pointers to the `heap'
+    for( size_t i =0; i < m->m; i++ ) {
+        heapptr_t ptr =heap_alloc( &heap, 1+m->row_ptr_end[i]-m->row_ptr_begin[i], i );
+        assert( ptr == m->row_ptr_begin[i] );
+    }
+
+    heap_debugPrint( &heap );
 
     // Iterate all rows except the last
     for( size_t pivot =0; pivot < m->m-1; pivot++ ) {
@@ -159,6 +164,7 @@ lup( matrix_t* m ) {
 
         int pivot_off =-1; // Location of the pivot in the source row
         int best_row =-1;
+        int best_length =-1;
         double abs_max =-1.0;
         // Iterate over all remaining rows (partial pivotting)
         for( size_t kk =pivot; kk < m->m; kk++ ) {
@@ -178,9 +184,30 @@ lup( matrix_t* m ) {
             if( x >= abs_max ) {
                 pivot_off =j - m->row_ptr_begin[k];
                 best_row =kk;
+                best_length =m->row_ptr_end[k] - m->row_ptr_begin[k] + 1;
             }
         }
         if( pivot_off == -1 ) continue; // Complete column is empty
+        
+/*        for( size_t kk =pivot; kk < m->m; kk++ ) {
+            const indx_t k =m->row_order[kk];
+            
+            // Find the pivot column in the source row
+            ssize_t j = column_offset( &m->col_ind[m->row_ptr_begin[k]],
+                                       (m->row_ptr_end[k] - m->row_ptr_begin[k]) + 1,
+                                       pivot );
+            if( j == -1 ) continue;
+
+            double x =fabs( m->values[m->row_ptr_begin[k+j]] );
+            int length = m->row_ptr_end[k] - m->row_ptr_begin[k] + 1;
+
+
+            if( x >= 0.999 * abs_max && length < best_length ) {
+                pivot_off =j;
+                best_row =kk;
+                best_length =m->row_ptr_end[k] - m->row_ptr_begin[k] + 1;
+            }
+        }*/
 
         swap_rows( m->row_order, ii, best_row );
         const indx_t i =m->row_order[ii];
@@ -247,7 +274,7 @@ lup( matrix_t* m ) {
         heap_free( &heap, next_empty, MAX_N_ELEMENTS - next_empty ); 
         heap_debugPrint( &heap );*/
     }
-
+    heap_debugPrint( &heap );
     return 0;
 }
 

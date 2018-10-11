@@ -138,7 +138,8 @@ main(int argc, char **argv)
     const size_t orig_count =M.count;
     printf( "Computing LUP: ...." );
     lup( &M );
-    printf( "\b\b\b\bdone.\n(i) Fill-in ratio is %f\n", (double)M.count/(double)orig_count );
+    printf( "\b\b\b\bdone.\n(i) Fill-in ratio is %f (%ld KiB / %ld KiB)\n", 
+            (double)M.count/(double)orig_count, M.count, orig_count );
 
     for( size_t i =0; i < N_REF_VECTORS; i++ ) {
         printf( "%ld: l_subst", i );
