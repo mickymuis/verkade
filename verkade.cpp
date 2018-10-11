@@ -6,6 +6,7 @@
 
 #include "matrix.h"
 #include "lup.h"
+#include "heap.h"
 
 /* Globals. Yuk. */
 
@@ -97,9 +98,27 @@ timespec_subtract (struct timespec *result,
   return x->tv_sec < y->tv_sec;
 }
 
+static region_desc_t HEAP_REGIONS[48];
+
 int
 main(int argc, char **argv)
 {
+/*    heap_t heap;
+    heap.regions = HEAP_REGIONS;
+    heap.capacity =48;
+    heap_clear( &heap, 32 );
+    heap_alloc( &heap, 4, 0 );
+    heapptr_t a = heap_alloc( &heap, 8, 0 );
+    heapptr_t b = heap_alloc( &heap, 2, 0 );
+    heapptr_t c = heap_alloc( &heap, 4, 0 );
+    heap_alloc( &heap, 6, 0 );
+    heap_debugPrint( &heap );
+    heap_free( &heap, b );
+    heap_debugPrint( &heap );
+    heap_free( &heap, a );
+    heap_debugPrint( &heap );
+    heap_free( &heap, c );
+    heap_debugPrint( &heap );*/
     if (argc != 2)
     {
       fprintf(stderr, "(i) Usage: %s <filename>\n", argv[0]);

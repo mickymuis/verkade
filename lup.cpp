@@ -153,7 +153,7 @@ lup( matrix_t* m ) {
         assert( ptr == m->row_ptr_begin[i] );
     }
 
-    heap_debugPrint( &heap );
+//    heap_debugPrint( &heap );
 
     // Iterate all rows except the last
     for( size_t pivot =0; pivot < m->m-1; pivot++ ) {
@@ -274,7 +274,7 @@ lup( matrix_t* m ) {
         heap_free( &heap, next_empty, MAX_N_ELEMENTS - next_empty ); 
         heap_debugPrint( &heap );*/
     }
-    heap_debugPrint( &heap );
+//    heap_debugPrint( &heap );
     return 0;
 }
 

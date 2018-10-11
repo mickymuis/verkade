@@ -74,15 +74,11 @@ heap_free( heap_t* h, heapptr_t ptr ) {
         return -1;
     }
 
-    // Set the region to free
-    h->regions[i].free     =true;
-    h->regions[i].userdata =0;
-
     // Lastly we check if adjacent regions are also free
     int move =0;
     heapptr_t base =h->regions[i].start;
     heapptr_t size =h->regions[i].size;
-    const size_t next =i+1;
+//    const size_t next =i+1;
 
     if( i != h->count && h->regions[i+1].free ) {
         move++;
@@ -91,19 +87,22 @@ heap_free( heap_t* h, heapptr_t ptr ) {
 
     if( i != 0 && h->regions[i-1].free ) {
         move++;
-        i--;
         size += h->regions[i-1].size;
         base = h->regions[i-1].start;
+        i--;
     }
 
     if( move ) {
-        memmove( &h->regions[next-move], &h->regions[next], (h->count-next) * sizeof(region_desc_t) );
+        memmove( &h->regions[i], &h->regions[i+move], (h->count-(i+move)) * sizeof(region_desc_t) );
 
         h->regions[i].start =base;
         h->regions[i].size  =size;
-        h->count += move;
+        h->count -= move;
 
     }
+    // Set the region to free
+    h->regions[i].free  =true;
+    h->regions[i].userdata =0;
 
     return 0;
 }
@@ -142,8 +141,8 @@ heap_debugPrint( heap_t* h ) {
     printf( "(i) Heap: total regions %ld, capacity %ld.\n", h->count, h->capacity );
     size_t totalsize =0, fragsize =0;
     for( size_t i =0; i < h->count; i++ ) {
-        //printf( "(*) Region %ld (%s), start %ld, size %ld\n", 
-        //i, h->regions[i].start, h->regions[i].size, h->regions[i].free ? "free" : "nonfree" );
+        printf( "(*) Region %ld (%s), start %ld, size %ld\n", 
+            i, h->regions[i].free ? "free" : "nonfree", h->regions[i].start, h->regions[i].size );
         if( h->regions[i].free) {
             totalsize += h->regions[i].size;
             if( i != h->count-1 )
