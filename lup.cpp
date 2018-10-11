@@ -50,9 +50,11 @@ replace_row( matrix_t* m,
     ssize_t delta = new_length - old_length;
 
    // printf( "(i) freeing %ld bytes at %ld.\n", old_length, m->row_ptr_begin[row] );
-    heap_free( heap, m->row_ptr_begin[row] );
+    if( heap_free( heap, m->row_ptr_begin[row] ) != 0 ) abort();
     //heap_debugPrint( heap );
-    size_t start = heap_alloc( heap, new_length, row );
+    heapsptr_t start = heap_alloc( heap, new_length, row );
+    if( start == -1 ) abort();
+
    // printf( "(i) allocing %ld bytes at %ld.\n", new_length, start );
     //heap_debugPrint( heap );
 
@@ -189,26 +191,6 @@ lup( matrix_t* m ) {
         }
         if( pivot_off == -1 ) continue; // Complete column is empty
         
-/*        for( size_t kk =pivot; kk < m->m; kk++ ) {
-            const indx_t k =m->row_order[kk];
-            
-            // Find the pivot column in the source row
-            ssize_t j = column_offset( &m->col_ind[m->row_ptr_begin[k]],
-                                       (m->row_ptr_end[k] - m->row_ptr_begin[k]) + 1,
-                                       pivot );
-            if( j == -1 ) continue;
-
-            double x =fabs( m->values[m->row_ptr_begin[k+j]] );
-            int length = m->row_ptr_end[k] - m->row_ptr_begin[k] + 1;
-
-
-            if( x >= 0.999 * abs_max && length < best_length ) {
-                pivot_off =j;
-                best_row =kk;
-                best_length =m->row_ptr_end[k] - m->row_ptr_begin[k] + 1;
-            }
-        }*/
-
         swap_rows( m->row_order, ii, best_row );
         const indx_t i =m->row_order[ii];
 

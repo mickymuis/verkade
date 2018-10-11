@@ -10,8 +10,8 @@ typedef ssize_t heapsptr_t;     // Signed offset
 typedef struct {
     heapptr_t start;
     size_t    size;
-    bool      free;
-    int       userdata;
+  //  bool      free;
+  //  int       userdata;
 } region_desc_t;
 
 typedef struct {
@@ -21,12 +21,11 @@ typedef struct {
 } heap_t;
 
 /* Custom memmove function that takes four arguments (in order):
- * - user pointer
- * - destination offset
- * - source offset
- * - total number of elements moved
+ * - user pointer passed to heap_defrag()
+ * - occupied region
+ * - absolute destination address 
  */
-typedef int (*heap_movefunc_t)( void*, heapptr_t, heapptr_t, size_t);
+typedef int (*heap_movefunc_t)( void*, region_desc_t, heapptr_t );
 
 void heap_clear( heap_t* h, size_t totalsize );
 

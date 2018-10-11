@@ -6,7 +6,7 @@
 #define MAX_N_ELEMENTS 1024 * 1024 * 128 // One GB worth of doubles //131072
 #define MAX_N_ROWS 16384
 #define N_REF_VECTORS 5
-#define HEAP_SIZE 16384
+#define HEAP_SIZE 2*16384
 
 typedef struct {
 
